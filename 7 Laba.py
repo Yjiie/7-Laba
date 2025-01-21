@@ -6,130 +6,127 @@
 '''
 import itertools
 import time
+import math
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, scrolledtext
+import random
 
-# Функция для проверки, что все точки находятся в пределах области
-def valid_path(path, area_limit):
-    for p in path:
-        if not (area_limit[0] <= p[0] <= area_limit[2] and area_limit[1] <= p[1] <= area_limit[3]):
-            return False
-    return True
+def is_square(points):
+    """Проверка, образуют ли 4 точки квадрат."""
+    if len(points) != 4:
+        return False
 
-# Алгоритмическая реализация с возвратом для генерации перестановок
-def generate_algorithmic(points):
-    def generate(current, remaining):
-        if len(remaining) == 0:
-            permutations.append(list(current))
-        else:
-            for i in range(len(remaining)):
-                generate(current + [remaining[i]], remaining[:i] + remaining[i+1:])
-    
-    permutations = []
-    generate([], points)
-    return permutations
+    # Вычисляем все расстояния между точками
+    distances = []
+    for i in range(len(points)):
+        for j in range(i + 1, len(points)):
+            dist = math.dist(points[i], points[j])
+            distances.append(dist)
 
-# Встроенная функция Python для генерации перестановок
-def generate_permutations_python(points):
-    return list(itertools.permutations(points))
+    distances.sort()
 
-# Алгоритмическая реализация с ограничениями
-def generate_algorithmic_with_limit(points, area_limit):
-    def generate(current, remaining):
-        if len(remaining) == 0:
-            if valid_path(current, area_limit):  # Проверка на корректность пути
-                permutations.append(list(current))
-        else:
-            for i in range(len(remaining)):
-                generate(current + [remaining[i]], remaining[:i] + remaining[i+1:])
-    
-    permutations = []
-    generate([], points)
-    return permutations
+    # У квадрата должно быть 4 равных стороны и 2 равных диагонали
+    if len(distances) != 6:
+        return False
 
-# Встроенная функция Python с ограничениями
-def generate_permutations_python_with_limit(points, area_limit):
-    valid_permutations = []
-    for perm in itertools.permutations(points):
-        if valid_path(perm, area_limit):
-            valid_permutations.append(perm)
-    return valid_permutations
+    side = distances[0]
+    diagonal = distances[4]
 
-# Функция для запуска генерации и вывода результатов
-def run_permutations():
-    # Получаем данные из полей ввода
-    points_input = points_entry.get()
-    area_input = area_entry.get()
+    return (
+        math.isclose(distances[0], side) and
+        math.isclose(distances[1], side) and
+        math.isclose(distances[2], side) and
+        math.isclose(distances[3], side) and
+        math.isclose(distances[4], diagonal) and
+        math.isclose(distances[5], diagonal) and
+        math.isclose(side * math.sqrt(2), diagonal)
+    )
 
-    # Преобразуем введенные данные в список точек
+def generate_squares_functional(points):
+    """Формирование квадратов с использованием функций Python."""
+    squares = []
+    for combination in itertools.combinations(points, 4):
+        # Ограничение: отфильтруем только те комбинации, где минимальная сторона квадрата больше 5
+        distances = [math.dist(combination[m], combination[n]) for m in range(4) for n in range(m + 1, 4)]
+        if min(distances) > 5 and is_square(combination):
+            squares.append(combination)
+    return squares
+
+def generate_squares_algorithmic(points):
+    """Формирование квадратов алгоритмическим методом."""
+    squares = []
+    n = len(points)
+    for i in range(n):
+        for j in range(i + 1, n):
+            for k in range(j + 1, n):
+                for l in range(k + 1, n):
+                    subset = [points[i], points[j], points[k], points[l]]
+                    distances = [math.dist(subset[m], subset[n]) for m in range(4) for n in range(m + 1, 4)]
+                    if min(distances) > 5 and is_square(subset):
+                        squares.append(subset)
+    return squares
+
+def generate_random_points(k, x_range=(0, 100), y_range=(0, 100)):
+    """Генерация K случайных точек."""
+    points = [(random.randint(*x_range), random.randint(*y_range)) for _ in range(k // 2)]
+    # Добавляем точки с потенциальной квадратной структурой
+    for _ in range(k // 2):
+        x, y = random.randint(*x_range), random.randint(*y_range)
+        size = random.randint(5, 15)
+        points.extend([(x, y), (x + size, y), (x, y + size), (x + size, y + size)])
+    return random.sample(points, k)
+
+def calculate():
     try:
-        points = [tuple(map(int, point.split(','))) for point in points_input.split(';')]
-        area_limit = tuple(map(int, area_input.split(',')))
+        k = int(entry_k.get())
+        points = generate_random_points(k)
+        output_text.insert(tk.END, f"Сгенерированные точки: {points}\n")
+
+        # Измеряем время для алгоритмического подхода
+        start_time = time.time()
+        squares_algorithmic = generate_squares_algorithmic(points)
+        elapsed_time_algorithmic = time.time() - start_time
+
+        # Измеряем время для функционального подхода
+        start_time = time.time()
+        squares_functional = generate_squares_functional(points)
+        elapsed_time_functional = time.time() - start_time
+
+        output_text.insert(tk.END, f"Найденные квадраты (алгоритмический подход): {squares_algorithmic}\n")
+        output_text.insert(tk.END, f"Время выполнения (алгоритмический подход): {elapsed_time_algorithmic:.6f} секунд\n")
+
+        output_text.insert(tk.END, f"Найденные квадраты (функциональный подход): {squares_functional}\n")
+        output_text.insert(tk.END, f"Время выполнения (функциональный подход): {elapsed_time_functional:.6f} секунд\n\n")
     except ValueError:
-        messagebox.showerror("Ошибка ввода", "Неверный формат ввода данных. Пожалуйста, введите правильные координаты.")
-        return
+        output_text.insert(tk.END, "Ошибка: Введите корректное число точек.\n")
 
-    # Измеряем время выполнения для алгоритмической реализации без ограничений
-    start_time = time.time()
-    algorithmic_permutations = generate_algorithmic(points)
-    algorithmic_time = time.time() - start_time
-
-    # Измеряем время выполнения для встроенной функции Python без ограничений
-    start_time = time.time()
-    python_permutations = generate_permutations_python(points)
-    python_time = time.time() - start_time
-
-    # Формируем результат для первой части
-    result_text.set(f"Алгоритмическая реализация без ограничений: {algorithmic_time:.6f} секунд\n"
-                    f"Встроенная функция Python без ограничений: {python_time:.6f} секунд\n")
-
-    # Измеряем время выполнения для алгоритмической реализации с ограничениями
-    start_time = time.time()
-    algorithmic_permutations_with_limit = generate_algorithmic_with_limit(points, area_limit)
-    algorithmic_time_with_limit = time.time() - start_time
-
-    # Измеряем время выполнения для встроенной функции Python с ограничениями
-    start_time = time.time()
-    python_permutations_with_limit = generate_permutations_python_with_limit(points, area_limit)
-    python_time_with_limit = time.time() - start_time
-
-    # Формируем результат для второй части
-    result_text.set(result_text.get() + f"Алгоритмическая реализация с ограничениями: {algorithmic_time_with_limit:.6f} секунд\n"
-                                        f"Встроенная функция Python с ограничениями: {python_time_with_limit:.6f} секунд\n")
-
-# Настройка графического интерфейса с использованием Tkinter
+# Интерфейс пользователя
 root = tk.Tk()
-root.title("Генерация перестановок точек")
+root.title("Поиск квадратов на плоскости")
 
-# Создаем поля ввода для точек и области
-tk.Label(root, text="Введите точки (x1,y1;x2,y2;...):").pack(pady=5)
-points_entry = tk.Entry(root, width=50)
-points_entry.pack(pady=5)
+frame_input = ttk.Frame(root, padding="10")
+frame_input.grid(row=0, column=0, sticky="EW")
 
-tk.Label(root, text="Введите область (x_min,y_min,x_max,y_max):").pack(pady=5)
-area_entry = tk.Entry(root, width=50)
-area_entry.pack(pady=5)
+label_k = ttk.Label(frame_input, text="Количество точек (K):")
+label_k.grid(row=0, column=0, sticky="W")
 
-# Кнопка для запуска генерации
-generate_button = tk.Button(root, text="Сгенерировать перестановки", command=run_permutations)
-generate_button.pack(pady=10)
+entry_k = ttk.Entry(frame_input, width=10)
+entry_k.grid(row=0, column=1, sticky="W")
 
-# Текстовое поле для отображения результатов с прокруткой
-result_text = tk.StringVar()
-result_label = tk.Label(root, textvariable=result_text, justify=tk.LEFT, width=70, height=10, relief="solid")
-result_label.pack(pady=5)
+button_calculate = ttk.Button(frame_input, text="Рассчитать", command=calculate)
+button_calculate.grid(row=0, column=2, padx=5)
 
-# Создаем виджет Text с прокруткой для вывода результатов
-text_box = tk.Text(root, width=70, height=15, wrap=tk.WORD)
-text_box.pack(pady=5)
-text_box.config(state=tk.DISABLED)  # Делаем поле текстовым, чтобы нельзя было редактировать
+frame_output = ttk.Frame(root, padding="10")
+frame_output.grid(row=1, column=0, sticky="NSEW")
 
-# Функция для обновления текста в поле
-def update_text_box(text):
-    text_box.config(state=tk.NORMAL)
-    text_box.delete(1.0, tk.END)  # Очищаем текстовое поле
-    text_box.insert(tk.END, text)  # Вставляем новый текст
-    text_box.config(state=tk.DISABLED)
+output_text = scrolledtext.ScrolledText(frame_output, wrap=tk.WORD, width=50, height=20)
+output_text.grid(row=0, column=0, sticky="NSEW")
 
-# Запуск графического интерфейса
+root.columnconfigure(0, weight=1)
+root.rowconfigure(1, weight=1)
+
+frame_output.columnconfigure(0, weight=1)
+frame_output.rowconfigure(0, weight=1)
+
 root.mainloop()
+
